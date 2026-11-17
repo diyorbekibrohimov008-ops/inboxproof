@@ -1,0 +1,16 @@
+{
+  "name": "inboxproof",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cold Email Deliverability & Spam Diagnostics SaaS ($19/mo Solopreneur Tier)",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node src/node-dev.ts",
+    "start": "node src/node-dev.ts",
+    "test": "node --test --test-isolation=none tests/*.test.ts",
+    "bundle": "node scripts/bundle-function.mjs"
+  }
+}

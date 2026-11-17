@@ -1,0 +1,1 @@
+InboxProof static placeholder (all routes served via Netlify Function).

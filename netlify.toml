@@ -1,0 +1,6 @@
+[build]
+  command = "node scripts/bundle-function.mjs"
+  publish = "public"
+
+[functions]
+  node_bundler = "esbuild"
