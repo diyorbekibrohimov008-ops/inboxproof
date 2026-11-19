@@ -22,12 +22,43 @@ export interface AppHandlerOptions {
   persistenceMode?: "postgres" | "memory";
 }
 
-const SECURITY_HEADERS = {
+const BASE_SECURITY_HEADERS = {
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
+
+const SECURITY_HEADERS = {
+  ...BASE_SECURITY_HEADERS,
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+};
+
+async function computeInlineScriptCsp(html: string): Promise<string> {
+  const hashes: string[] = [];
+  const encoder = new TextEncoder();
+  const tagOpen = "<script";
+  const tagClose = "</script>";
+  let pos = 0;
+  while (pos < html.length) {
+    const start = html.indexOf(tagOpen, pos);
+    if (start === -1) break;
+    const gt = html.indexOf(">", start);
+    const end = gt === -1 ? -1 : html.indexOf(tagClose, gt + 1);
+    if (gt === -1 || end === -1) break;
+    const body = html.slice(gt + 1, end);
+    if (body.trim().length > 0) {
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", encoder.encode(body));
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+      hashes.push(`'sha256-${b64}'`);
+    }
+    pos = end + tagClose.length;
+  }
+  const scriptSrc = hashes.length > 0 ? `'self' ${hashes.join(" ")}` : "'self'";
+  return `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`;
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -55,6 +86,7 @@ export function createAppHandler(options: AppHandlerOptions = {}) {
     : createAutoWorkspaceStore();
   const store = auto.store;
   const html = renderAppHtml();
+  let cachedHtmlCsp: string | null = null;
 
   return async function handleRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -71,18 +103,22 @@ export function createAppHandler(options: AppHandlerOptions = {}) {
 
     try {
       if (method === "GET" && path === "/") {
+        if (!cachedHtmlCsp) {
+          cachedHtmlCsp = await computeInlineScriptCsp(html);
+        }
         return new Response(html, {
           status: 200,
           headers: {
             "Content-Type": "text/html; charset=utf-8",
-            ...SECURITY_HEADERS,
+            ...BASE_SECURITY_HEADERS,
+            "Content-Security-Policy": cachedHtmlCsp,
           },
         });
       }
 
       if (method === "GET" && path === "/favicon.ico") {
         return new Response(
-          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#2563eb"/><text x="16" y="21" font-family="sans-serif" font-size="14" font-weight="800" fill="#fff" text-anchor="middle">IP</text></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0369a1"/><text x="16" y="21" font-family="sans-serif" font-size="14" font-weight="800" fill="#fff" text-anchor="middle">IP</text></svg>',
           {
             status: 200,
             headers: {

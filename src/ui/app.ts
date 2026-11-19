@@ -4,7 +4,13 @@ export function renderAppHtml(): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InboxProof — Cold Email Deliverability & One-Click DNS Fix ($19/mo)</title>
+  <meta name="theme-color" content="#f6f7fb" />
+  <meta
+    name="description"
+    content="InboxProof — Cold email deliverability telemetry, spam-trigger analysis, and one-click SPF, DKIM & DMARC remediation."
+  />
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <title>InboxProof — Cold Email Deliverability &amp; One-Click DNS Fix ($19/mo)</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -15,9 +21,9 @@ export function renderAppHtml(): string {
       --ink: #0f172a;
       --ink-secondary: #475569;
       --ink-muted: #64748b;
-      --accent: #2563eb;
-      --accent-hover: #1d4ed8;
-      --accent-soft: #eff6ff;
+      --accent: #0369a1;
+      --accent-hover: #075985;
+      --accent-soft: #e0f2fe;
       --pass: #059669;
       --pass-soft: #ecfdf5;
       --pass-border: #a7f3d0;
@@ -28,7 +34,7 @@ export function renderAppHtml(): string {
       --fail-soft: #fff1f2;
       --fail-border: #fecdd3;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --sans: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
       --radius: 12px;
       --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
       --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.06);
@@ -42,6 +48,21 @@ export function renderAppHtml(): string {
       color: var(--ink);
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+    }
+
+    button:focus-visible, a:focus-visible, summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
 
     .topbar {
@@ -71,13 +92,13 @@ export function renderAppHtml(): string {
       width: 34px;
       height: 34px;
       border-radius: 9px;
-      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      background: linear-gradient(135deg, #0369a1, #0d9488);
       color: #fff;
       display: grid;
       place-items: center;
       font-weight: 800;
       font-size: 16px;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+      box-shadow: 0 4px 12px rgba(3, 105, 161, 0.25);
     }
     .brand-title {
       font-weight: 750;
@@ -131,7 +152,7 @@ export function renderAppHtml(): string {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: all 0.15s ease;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
     .btn:hover { background: var(--surface-muted); border-color: #94a3b8; }
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -139,7 +160,7 @@ export function renderAppHtml(): string {
       background: var(--accent);
       border-color: var(--accent);
       color: #fff;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.22);
+      box-shadow: 0 2px 8px rgba(3, 105, 161, 0.22);
     }
     .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
     .btn-success {
@@ -202,8 +223,9 @@ export function renderAppHtml(): string {
       align-items: start;
     }
     @media (max-width: 1060px) {
-      .workspace-grid { grid-template-columns: 1fr; }
+      .workspace-grid { grid-template-columns: minmax(0, 1fr); }
     }
+    .workspace-grid > * { min-width: 0; }
 
     .card {
       background: var(--surface);
@@ -253,8 +275,13 @@ export function renderAppHtml(): string {
     .field { margin-bottom: 12px; }
     .field-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
+    }
+    @media (max-width: 640px) {
+      .field-row { grid-template-columns: minmax(0, 1fr); }
+      .card-header { flex-wrap: wrap; }
+      .dns-kv { grid-template-columns: minmax(0, 1fr); }
     }
     label {
       display: flex;
@@ -279,7 +306,7 @@ export function renderAppHtml(): string {
     }
     input[type="text"]:focus, select:focus, textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.12);
     }
     textarea { resize: vertical; min-height: 150px; line-height: 1.5; }
     textarea.mono { font-family: var(--mono); font-size: 12px; min-height: 220px; }

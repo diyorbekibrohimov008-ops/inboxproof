@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node src/node-dev.ts",
     "start": "node src/node-dev.ts",
-    "test": "node --test --test-isolation=none tests/*.test.ts",
+    "test": "node --test --test-isolation=none \"tests/*.test.ts\"",
     "bundle": "node scripts/bundle-function.mjs"
   }
 }

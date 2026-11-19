@@ -12,3 +12,6 @@ dist/
 *.pem
 *.key
 .data/
+
+.vercel
+.env*
