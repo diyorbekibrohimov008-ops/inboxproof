@@ -2,6 +2,10 @@
 
 Accessible cold email deliverability platform built for indie sales reps and solopreneurs switching from $85–$185/mo incumbents (GlockApps, MailReach).
 
+> [!WARNING]
+> **Project Status — Work in Progress (Not Fully Ready)**
+> This project is currently under active development and is **not fully ready for production**. Some parts, features, or workflow steps will fail or behave unexpectedly. We are actively working on fixing all remaining issues.
+
 ## Features
 
 1. **Accessible Solopreneur Tier ($19/mo · 20 Deep Placement Tests/month)**

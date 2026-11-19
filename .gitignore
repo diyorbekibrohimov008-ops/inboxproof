@@ -5,3 +5,10 @@ dist/
 .vercel/
 .env
 .env.*
+
+# Secrets, environment variables, and deploy state
+*.env
+!.env.example
+*.pem
+*.key
+.data/
