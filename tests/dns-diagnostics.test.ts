@@ -89,6 +89,11 @@ test("analyzeDmarc warns on p=none and passes p=quarantine/reject with rua", () 
   const strict = analyzeDmarc(["v=DMARC1; p=reject; adkim=s; aspf=r; rua=mailto:dmarc@acme.com"]);
   assert.equal(strict.status, "pass");
   assert.equal(strict.policy, "reject");
+
+  const zeroPct = analyzeDmarc(["v=DMARC1; p=quarantine; pct=0; rua=mailto:dmarc@acme.com"]);
+  assert.equal(zeroPct.pct, 0);
+  assert.equal(zeroPct.status, "warn");
+  assert.ok(zeroPct.issues.some((i) => i.code === "DMARC_PARTIAL_PCT"));
 });
 
 test("diagnoseDomain aggregates MX, SPF, auto-probed DKIM, DMARC, and BIMI", async () => {

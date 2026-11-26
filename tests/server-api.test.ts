@@ -26,7 +26,7 @@ function createTestResolver(): DnsResolver {
   };
 }
 
-test("GET /health and GET / render healthy HTML & JSON", async () => {
+test("GET /health and GET / render healthy Free Forever HTML & JSON", async () => {
   const handler = createAppHandler({ resolver: createTestResolver() });
 
   const healthRes = await handler(new Request("http://localhost/health"));
@@ -40,10 +40,16 @@ test("GET /health and GET / render healthy HTML & JSON", async () => {
   assert.match(htmlRes.headers.get("content-type") ?? "", /text\/html/);
   const html = await htmlRes.text();
   assert.match(html, /InboxProof/);
-  assert.match(html, /\$19\/mo/);
+  assert.match(html, /\$0\/mo/);
+  assert.match(html, /Free Forever/i);
+  assert.match(html, /Proves you sent the email/);
+  assert.match(html, /Tamper-proof seal/);
+  assert.match(html, /Tells inboxes how to handle fakes/);
+  assert.doesNotMatch(html, /\$19\/mo/);
+  assert.doesNotMatch(html, /\$39\/mo/);
 });
 
-test("POST /api/tests/run executes full diagnostic, deducts 1 credit, and persists report", async () => {
+test("POST /api/tests/run executes unlimited free diagnostics without paywalls and persists reports", async () => {
   const handler = createAppHandler({ resolver: createTestResolver() });
 
   const runRes = await handler(
@@ -62,28 +68,78 @@ test("POST /api/tests/run executes full diagnostic, deducts 1 credit, and persis
 
   assert.equal(runRes.status, 200);
   const payload = (await runRes.json()) as {
-    workspace: { creditsRemaining: number; plan: { priceUsdMonthly: number } };
-    report: { domain: string; summary: { inboxPct: number }; diagnostics: { authScore: number } };
+    workspace: {
+      testsRun: number;
+      creditsRemaining: number | null;
+      unlimited: boolean;
+      plan: { id: string; priceUsdMonthly: number; monthlyLimit: number | null; unlimited: boolean };
+    };
+    report: { id: string; domain: string; summary: { inboxPct: number }; diagnostics: { authScore: number } };
   };
 
-  assert.equal(payload.workspace.plan.priceUsdMonthly, 19);
-  assert.equal(payload.workspace.creditsRemaining, 19);
+  assert.equal(payload.workspace.plan.id, "free");
+  assert.equal(payload.workspace.plan.priceUsdMonthly, 0);
+  assert.equal(payload.workspace.plan.monthlyLimit, null);
+  assert.equal(payload.workspace.plan.unlimited, true);
+  assert.equal(payload.workspace.unlimited, true);
+  assert.equal(payload.workspace.creditsRemaining, null);
+  assert.equal(payload.workspace.testsRun, 1);
   assert.equal(payload.report.domain, "good-cold.io");
   assert.ok(payload.report.summary.inboxPct >= 85);
   assert.ok(payload.report.diagnostics.authScore >= 90);
 
+  // Verify running >20 tests never triggers a 402 quota error
+  for (let i = 0; i < 21; i++) {
+    const res = await handler(
+      new Request("http://localhost/api/tests/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: "ws-api-test",
+          fromEmail: "alex@good-cold.io",
+          providerPreset: "google-workspace",
+          subject: `Follow up ${i + 2}`,
+          body: "Quick note.",
+        }),
+      }),
+    );
+    assert.equal(res.status, 200);
+  }
+
   const wsRes = await handler(new Request("http://localhost/api/workspace?workspaceId=ws-api-test"));
   assert.equal(wsRes.status, 200);
   const wsData = (await wsRes.json()) as {
-    workspace: { creditsRemaining: number };
-    reports: Array<{ domain: string }>;
+    workspace: { testsRun: number; creditsRemaining: number | null; unlimited: boolean };
+    reports: Array<{ id: string; domain: string }>;
   };
-  assert.equal(wsData.workspace.creditsRemaining, 19);
-  assert.equal(wsData.reports.length, 1);
+  assert.equal(wsData.workspace.testsRun, 22);
+  assert.equal(wsData.workspace.creditsRemaining, null);
+  assert.equal(wsData.workspace.unlimited, true);
+  assert.equal(wsData.reports.length, 22);
   assert.equal(wsData.reports[0].domain, "good-cold.io");
 });
 
-test("POST /api/copy/rewrite rewrites spammy cold email without deducting credits", async () => {
+test("POST /api/workspace/plan always returns 100% Free Forever unlimited status", async () => {
+  const handler = createAppHandler({ resolver: createTestResolver() });
+
+  const res = await handler(
+    new Request("http://localhost/api/workspace/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: "ws-plan-check", planId: "growth" }),
+    }),
+  );
+
+  assert.equal(res.status, 200);
+  const data = (await res.json()) as {
+    workspace: { unlimited: boolean; plan: { id: string; priceUsdMonthly: number } };
+  };
+  assert.equal(data.workspace.plan.id, "free");
+  assert.equal(data.workspace.plan.priceUsdMonthly, 0);
+  assert.equal(data.workspace.unlimited, true);
+});
+
+test("POST /api/copy/rewrite rewrites spammy cold email for free", async () => {
   const handler = createAppHandler({ resolver: createTestResolver() });
 
   const res = await handler(
@@ -108,7 +164,7 @@ test("POST /api/copy/rewrite rewrites spammy cold email without deducting credit
   assert.ok(data.rewrittenBody.includes("{{first_name}}"));
 });
 
-test("POST /api/diagnose/dns returns live DNS + registrar remediation without charging credits", async () => {
+test("POST /api/diagnose/dns returns live DNS + registrar remediation for free", async () => {
   const handler = createAppHandler({ resolver: createTestResolver() });
 
   const res = await handler(

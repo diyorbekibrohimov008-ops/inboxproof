@@ -89,3 +89,22 @@ test("buildRemediationPlan uses @ host for apex root domain and enforces Cloudfl
   assert.equal(dkimFix.recordsByRegistrar.cloudflare.type, "CNAME");
   assert.equal(dkimFix.recordsByRegistrar.cloudflare.proxyStatus, "DNS Only (Grey Cloud)");
 });
+
+test("buildRemediationPlan does not duplicate ~all when rewriting an SPF record that already ends with ~all or -all", () => {
+  const diag = makeBrokenDiagnostics("acme.com");
+  diag.spf = {
+    status: "warn",
+    raw: "v=spf1 include:_spf.google.com ptr ~all",
+    records: ["v=spf1 include:_spf.google.com ptr ~all"],
+    lookupCount: 2,
+    includes: ["_spf.google.com"],
+    qualifier: "~all",
+    issues: [{ code: "SPF_PTR_DEPRECATED", severity: "warning", summary: "Deprecated ptr" }],
+  };
+
+  const plan = buildRemediationPlan(diag, { providerPreset: "google-workspace" });
+  const spfFix = plan.fixes.find((f) => f.category === "SPF");
+  assert.ok(spfFix);
+  const allMatches = spfFix.recordsByRegistrar.cloudflare.value.match(/[~+\-?]all\b/g) ?? [];
+  assert.equal(allMatches.length, 1);
+});

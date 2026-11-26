@@ -537,7 +537,8 @@ export function analyzeDmarc(txtRecords: string[]): DmarcDiagnostics {
     ? tags.sp.toLowerCase()
     : null) as DmarcDiagnostics["subdomainPolicy"];
 
-  const pct = tags.pct ? Math.max(0, Math.min(100, Number(tags.pct) || 100)) : 100;
+  const parsedPct = tags.pct !== undefined && tags.pct !== "" ? Number(tags.pct) : 100;
+  const pct = Number.isFinite(parsedPct) ? Math.max(0, Math.min(100, parsedPct)) : 100;
   const adkim = tags.adkim?.toLowerCase() === "s" ? "s" : "r";
   const aspf = tags.aspf?.toLowerCase() === "s" ? "s" : "r";
   const rua = tags.rua
@@ -666,9 +667,7 @@ export async function diagnoseDomain(
       ? { ...probedResults[0], checkedSelectors }
       : analyzeDkim(options.selector?.trim() || "s1", []);
 
-  if (!dkim) {
-    dkim = analyzeDkim(options.selector?.trim() || "s1", []);
-  } else if (!dkim.raw) {
+  if (!dkim.raw) {
     dkim = {
       ...dkim,
       selector: options.selector?.trim() || "s1",

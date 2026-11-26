@@ -11,10 +11,26 @@ import {
 import { parseEmailHeaders, runPlacementTest } from "./placement/seed-engine.ts";
 import {
   createAutoWorkspaceStore,
-  createWorkspaceStore,
   type WorkspaceStore,
 } from "./store/workspace-store.ts";
 import { renderAppHtml } from "./ui/app.ts";
+
+const ALLOWED_PROVIDER_PRESETS = new Set<ProviderPreset>([
+  "google-workspace",
+  "microsoft-365",
+  "zoho",
+  "amazon-ses",
+  "postmark",
+  "resend",
+  "custom-smtp",
+]);
+
+function normalizeProviderPreset(value: unknown): ProviderPreset {
+  if (typeof value === "string" && ALLOWED_PROVIDER_PRESETS.has(value as ProviderPreset)) {
+    return value as ProviderPreset;
+  }
+  return "google-workspace";
+}
 
 export interface AppHandlerOptions {
   resolver?: DnsResolver;
@@ -158,8 +174,7 @@ export function createAppHandler(options: AppHandlerOptions = {}) {
       if (method === "POST" && path === "/api/workspace/plan") {
         const body = await readJsonBody(req);
         const workspaceId = String(body.workspaceId || "ws-default").trim();
-        const planId = body.planId === "growth" ? "growth" : "solopreneur";
-        const workspace = await store.switchPlan(workspaceId, planId);
+        const workspace = await store.switchPlan(workspaceId, "free");
         return json({ workspace });
       }
 
@@ -185,9 +200,7 @@ export function createAppHandler(options: AppHandlerOptions = {}) {
           return json({ error: "Please provide a domain or sender email address." }, 400);
         }
         const selector = typeof body.selector === "string" ? body.selector.trim() : undefined;
-        const providerPreset = (typeof body.providerPreset === "string"
-          ? body.providerPreset
-          : "google-workspace") as ProviderPreset;
+        const providerPreset = normalizeProviderPreset(body.providerPreset);
 
         const diagnostics = await diagnoseDomain(domainOrEmail, {
           selector: selector || undefined,
@@ -218,22 +231,10 @@ export function createAppHandler(options: AppHandlerOptions = {}) {
           parsedHeaders?.dkimSelector ||
           undefined;
 
-        const providerPreset = (typeof body.providerPreset === "string"
-          ? body.providerPreset
-          : "google-workspace") as ProviderPreset;
+        const providerPreset = normalizeProviderPreset(body.providerPreset);
 
         const subject = String(body.subject || parsedHeaders?.subject || "(No subject)");
         const emailBody = String(body.body || parsedHeaders?.body || "");
-
-        const existingWs = await store.getWorkspace(workspaceId);
-        if (existingWs.creditsRemaining <= 0) {
-          return json(
-            {
-              error: `Monthly placement test limit reached (${existingWs.plan.monthlyLimit}/${existingWs.plan.monthlyLimit} used on ${existingWs.plan.name} $${existingWs.plan.priceUsdMonthly}/mo). Reset sandbox credits or upgrade plan.`,
-            },
-            402,
-          );
-        }
 
         const diagnostics = await diagnoseDomain(fromEmail, { selector, resolver });
         const report = runPlacementTest({

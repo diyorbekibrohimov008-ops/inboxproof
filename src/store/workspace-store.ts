@@ -1,8 +1,9 @@
 export interface WorkspacePlan {
-  id: "solopreneur" | "growth";
+  id: "free";
   name: string;
   priceUsdMonthly: number;
-  monthlyLimit: number;
+  monthlyLimit: number | null;
+  unlimited: boolean;
 }
 
 export interface StoredReportSummary {
@@ -19,9 +20,11 @@ export interface StoredReportSummary {
 export interface WorkspaceState {
   workspaceId: string;
   plan: WorkspacePlan;
+  testsRun: number;
   creditsUsed: number;
-  creditsRemaining: number;
-  billingCycleResetsAt: string;
+  creditsRemaining: number | null;
+  unlimited: boolean;
+  billingCycleResetsAt: string | null;
 }
 
 export interface WorkspaceStore {
@@ -30,38 +33,25 @@ export interface WorkspaceStore {
   listReports(workspaceId: string): Promise<StoredReportSummary[]>;
   getReport(workspaceId: string, reportId: string): Promise<StoredReportSummary | null>;
   resetSandboxCredits(workspaceId: string): Promise<WorkspaceState>;
-  switchPlan(workspaceId: string, planId: "solopreneur" | "growth"): Promise<WorkspaceState>;
+  switchPlan(workspaceId: string, planId?: string): Promise<WorkspaceState>;
 }
 
-const PLANS: Record<"solopreneur" | "growth", WorkspacePlan> = {
-  solopreneur: {
-    id: "solopreneur",
-    name: "Solopreneur",
-    priceUsdMonthly: 19,
-    monthlyLimit: 20,
-  },
-  growth: {
-    id: "growth",
-    name: "Growth",
-    priceUsdMonthly: 39,
-    monthlyLimit: 75,
-  },
+const FREE_PLAN: WorkspacePlan = {
+  id: "free",
+  name: "Free Forever",
+  priceUsdMonthly: 0,
+  monthlyLimit: null,
+  unlimited: true,
 };
 
-function nextMonthResetIso(): string {
-  const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return next.toISOString();
-}
-
 export function createWorkspaceStore(): WorkspaceStore {
-  const workspaces = new Map<string, { planId: "solopreneur" | "growth"; creditsUsed: number }>();
+  const workspaces = new Map<string, { testsRun: number }>();
   const reports = new Map<string, StoredReportSummary[]>();
 
   function ensureWs(workspaceId: string) {
     let ws = workspaces.get(workspaceId);
     if (!ws) {
-      ws = { planId: "solopreneur", creditsUsed: 0 };
+      ws = { testsRun: 0 };
       workspaces.set(workspaceId, ws);
     }
     return ws;
@@ -69,13 +59,14 @@ export function createWorkspaceStore(): WorkspaceStore {
 
   function formatState(workspaceId: string): WorkspaceState {
     const ws = ensureWs(workspaceId);
-    const plan = PLANS[ws.planId];
     return {
       workspaceId,
-      plan,
-      creditsUsed: ws.creditsUsed,
-      creditsRemaining: Math.max(0, plan.monthlyLimit - ws.creditsUsed),
-      billingCycleResetsAt: nextMonthResetIso(),
+      plan: FREE_PLAN,
+      testsRun: ws.testsRun,
+      creditsUsed: ws.testsRun,
+      creditsRemaining: null,
+      unlimited: true,
+      billingCycleResetsAt: null,
     };
   }
 
@@ -89,13 +80,7 @@ export function createWorkspaceStore(): WorkspaceStore {
       entry: StoredReportSummary,
     ): Promise<WorkspaceState> {
       const ws = ensureWs(workspaceId);
-      const plan = PLANS[ws.planId];
-      if (ws.creditsUsed >= plan.monthlyLimit) {
-        throw new Error(
-          `Monthly placement test limit reached (${plan.monthlyLimit}/${plan.monthlyLimit} used on ${plan.name} $${plan.priceUsdMonthly}/mo plan).`,
-        );
-      }
-      ws.creditsUsed += 1;
+      ws.testsRun += 1;
       const list = reports.get(workspaceId) ?? [];
       list.unshift(entry);
       if (list.length > 50) list.pop();
@@ -113,13 +98,12 @@ export function createWorkspaceStore(): WorkspaceStore {
 
     async resetSandboxCredits(workspaceId: string): Promise<WorkspaceState> {
       const ws = ensureWs(workspaceId);
-      ws.creditsUsed = 0;
+      ws.testsRun = 0;
       return formatState(workspaceId);
     },
 
-    async switchPlan(workspaceId: string, planId: "solopreneur" | "growth"): Promise<WorkspaceState> {
-      const ws = ensureWs(workspaceId);
-      ws.planId = planId;
+    async switchPlan(workspaceId: string, _planId?: string): Promise<WorkspaceState> {
+      ensureWs(workspaceId);
       return formatState(workspaceId);
     },
   };
@@ -134,11 +118,13 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
     Bun?: { env?: Record<string, string | undefined>; sql?: BunSqlClient };
   };
   const dbUrl = globalAny.Bun?.env?.DATABASE_URL ?? process.env?.DATABASE_URL;
-  const sql = globalAny.Bun?.sql;
+  const bunSql = globalAny.Bun?.sql;
 
-  if (!dbUrl || !sql) {
+  if (!dbUrl || !bunSql) {
     return { store: createWorkspaceStore(), mode: "memory" };
   }
+
+  const sql: BunSqlClient = bunSql;
 
   const memoryFallback = createWorkspaceStore();
   let schemaReady: Promise<void> | null = null;
@@ -149,7 +135,7 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
         await sql`
           CREATE TABLE IF NOT EXISTS workspaces (
             workspace_id TEXT PRIMARY KEY,
-            plan_id TEXT NOT NULL DEFAULT 'solopreneur',
+            plan_id TEXT NOT NULL DEFAULT 'free',
             credits_used INTEGER NOT NULL DEFAULT 0,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           )
@@ -175,14 +161,15 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
     await schemaReady;
   }
 
-  function toState(workspaceId: string, planId: string, creditsUsed: number): WorkspaceState {
-    const plan = PLANS[planId === "growth" ? "growth" : "solopreneur"];
+  function toState(workspaceId: string, testsRun: number): WorkspaceState {
     return {
       workspaceId,
-      plan,
-      creditsUsed,
-      creditsRemaining: Math.max(0, plan.monthlyLimit - creditsUsed),
-      billingCycleResetsAt: nextMonthResetIso(),
+      plan: FREE_PLAN,
+      testsRun,
+      creditsUsed: testsRun,
+      creditsRemaining: null,
+      unlimited: true,
+      billingCycleResetsAt: null,
     };
   }
 
@@ -192,14 +179,14 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
         await ensureSchema();
         await sql`
           INSERT INTO workspaces (workspace_id, plan_id, credits_used)
-          VALUES (${workspaceId}, 'solopreneur', 0)
+          VALUES (${workspaceId}, 'free', 0)
           ON CONFLICT (workspace_id) DO NOTHING
         `;
         const rows = await sql`
-          SELECT workspace_id, plan_id, credits_used FROM workspaces WHERE workspace_id = ${workspaceId}
+          SELECT workspace_id, credits_used FROM workspaces WHERE workspace_id = ${workspaceId}
         `;
         const row = rows[0];
-        return toState(workspaceId, String(row?.plan_id ?? "solopreneur"), Number(row?.credits_used ?? 0));
+        return toState(workspaceId, Number(row?.credits_used ?? 0));
       } catch {
         return memoryFallback.getWorkspace(workspaceId);
       }
@@ -212,14 +199,9 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
       try {
         await ensureSchema();
         const current = await pgStore.getWorkspace(workspaceId);
-        if (current.creditsRemaining <= 0) {
-          throw new Error(
-            `Monthly placement test limit reached (${current.plan.monthlyLimit}/${current.plan.monthlyLimit} used on ${current.plan.name} $${current.plan.priceUsdMonthly}/mo plan).`,
-          );
-        }
-        const nextUsed = current.creditsUsed + 1;
+        const nextUsed = current.testsRun + 1;
         await sql`
-          UPDATE workspaces SET credits_used = ${nextUsed}, updated_at = NOW()
+          UPDATE workspaces SET plan_id = 'free', credits_used = ${nextUsed}, updated_at = NOW()
           WHERE workspace_id = ${workspaceId}
         `;
         await sql`
@@ -237,11 +219,8 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
           )
           ON CONFLICT (id) DO NOTHING
         `;
-        return toState(workspaceId, current.plan.id, nextUsed);
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("Monthly placement test limit reached")) {
-          throw err;
-        }
+        return toState(workspaceId, nextUsed);
+      } catch {
         return memoryFallback.consumeCreditAndSaveReport(workspaceId, entry);
       }
     },
@@ -301,7 +280,7 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
       try {
         await ensureSchema();
         await sql`
-          UPDATE workspaces SET credits_used = 0, updated_at = NOW()
+          UPDATE workspaces SET plan_id = 'free', credits_used = 0, updated_at = NOW()
           WHERE workspace_id = ${workspaceId}
         `;
         return pgStore.getWorkspace(workspaceId);
@@ -310,17 +289,17 @@ export function createAutoWorkspaceStore(): { store: WorkspaceStore; mode: "post
       }
     },
 
-    async switchPlan(workspaceId: string, planId: "solopreneur" | "growth"): Promise<WorkspaceState> {
+    async switchPlan(workspaceId: string, _planId?: string): Promise<WorkspaceState> {
       try {
         await ensureSchema();
         await sql`
           INSERT INTO workspaces (workspace_id, plan_id, credits_used)
-          VALUES (${workspaceId}, ${planId}, 0)
-          ON CONFLICT (workspace_id) DO UPDATE SET plan_id = ${planId}, updated_at = NOW()
+          VALUES (${workspaceId}, 'free', 0)
+          ON CONFLICT (workspace_id) DO UPDATE SET plan_id = 'free', updated_at = NOW()
         `;
         return pgStore.getWorkspace(workspaceId);
       } catch {
-        return memoryFallback.switchPlan(workspaceId, planId);
+        return memoryFallback.switchPlan(workspaceId, "free");
       }
     },
   };

@@ -274,7 +274,7 @@ export function runPlacementTest(params: {
   });
 
   return {
-    id: params.id ?? `run-${Date.now()}`,
+    id: params.id ?? `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     domain: diagnostics.domain,
     fromEmail,
     providerPreset,

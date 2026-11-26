@@ -1,6 +1,6 @@
-# InboxProof — Cold Email Deliverability & Spam Diagnostics ($19/mo)
+# InboxProof — Cold Email Deliverability & Spam Diagnostics (100% Free & Unlimited)
 
-Accessible cold email deliverability platform built for indie sales reps and solopreneurs switching from $85–$185/mo incumbents (GlockApps, MailReach).
+100% Free & Unlimited cold email deliverability platform built for indie sales reps, founders, and teams switching from $85–$185/mo incumbents (GlockApps, MailReach). **$0/mo forever** — all features unlocked, no credit card, no trials, and no monthly test limits.
 
 > [!WARNING]
 > **Project Status — Work in Progress (Not Fully Ready)**
@@ -8,8 +8,8 @@ Accessible cold email deliverability platform built for indie sales reps and sol
 
 ## Features
 
-1. **Accessible Solopreneur Tier ($19/mo · 20 Deep Placement Tests/month)**
-   - Monthly placement credit tracking with test history and plan switcher (`Solopreneur $19/mo` / `Growth $39/mo`).
+1. **100% Free & Unlimited Forever ($0/mo · Unlimited Deep Placement Tests)**
+   - Run unlimited 18-node deep placement tests with persistent test history — no credit caps, no paywalls, and no paid tiers (saving 100% vs $85–$185/mo incumbents).
 2. **Live DNS Diagnostics & 18-Node Global Seed Placement**
    - Queries MX, SPF (with exact RFC 7208 10-lookup counter), auto-probed DKIM selectors & key bit strength, DMARC, BIMI, and Spamhaus DBL.
    - Supports pasting raw `.eml` headers (`Authentication-Results`, `DKIM-Signature`, `Return-Path`) to audit SPF/DKIM domain alignment.

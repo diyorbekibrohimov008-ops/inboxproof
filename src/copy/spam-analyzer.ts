@@ -423,31 +423,35 @@ export async function rewriteSpamCopyWithOptionalLlm(
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 7000);
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openAiKey}`,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "Rewrite cold email subject and body so they pass Gmail/M365 spam filters. Keep personalization tokens like {{first_name}} verbatim. Avoid hype, ALL CAPS, URL shorteners, and guarantees. Return JSON: { subject: string, body: string }.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify({ subject, body }),
-          },
-        ],
-      }),
-    });
-    clearTimeout(timer);
+    let res: Response;
+    try {
+      res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openAiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          temperature: 0.3,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content:
+                "Rewrite cold email subject and body so they pass Gmail/M365 spam filters. Keep personalization tokens like {{first_name}} verbatim. Avoid hype, ALL CAPS, URL shorteners, and guarantees. Return JSON: { subject: string, body: string }.",
+            },
+            {
+              role: "user",
+              content: JSON.stringify({ subject, body }),
+            },
+          ],
+        }),
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) return deterministic;
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

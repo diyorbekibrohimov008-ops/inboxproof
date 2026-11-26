@@ -55,7 +55,10 @@ try {
       }),
     })
   ).json();
-  assert.equal(testRun.workspace.creditsRemaining, 19);
+  assert.equal(testRun.workspace.plan.priceUsdMonthly, 0);
+  assert.equal(testRun.workspace.unlimited, true);
+  assert.equal(testRun.workspace.creditsRemaining, null);
+  assert.equal(testRun.workspace.testsRun, 1);
   assert.ok(testRun.report.remediation.fixes.length >= 3);
 
   const liveDns = await (
@@ -77,7 +80,8 @@ try {
     liveResendAuthScore: liveDns.diagnostics.authScore,
     rewriteBefore: rewrite.beforeAnalysis.spamScore,
     rewriteAfter: rewrite.afterAnalysis.spamScore,
-    creditsRemaining: testRun.workspace.creditsRemaining,
+    testsRun: testRun.workspace.testsRun,
+    unlimited: testRun.workspace.unlimited,
     fixesGenerated: testRun.report.remediation.fixes.length,
   });
 } finally {

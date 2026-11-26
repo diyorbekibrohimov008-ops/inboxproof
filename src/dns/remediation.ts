@@ -236,7 +236,7 @@ export function buildRemediationPlan(
       diagnostics.spf.records.length > 0 &&
       diagnostics.spf.lookupCount <= 10 &&
       diagnostics.spf.records.length === 1
-        ? diagnostics.spf.records[0].replace(/[+?]?all$/i, "").trim() + " ~all"
+        ? diagnostics.spf.records[0].replace(/\s*[+\-~?]?all\b.*$/i, "").trim() + " ~all"
         : `v=spf1 ${providerInclude} ~all`;
 
     const isLookupErr = diagnostics.spf.issues.some((i) => i.code === "SPF_TOO_MANY_LOOKUPS");
